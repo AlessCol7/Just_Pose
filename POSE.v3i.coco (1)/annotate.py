@@ -7,6 +7,8 @@ def annotate_images(image_folder):
     annotations = []
     image_files = os.listdir(image_folder)
     
+    image_id = 1  # Starting image ID
+    
     for filename in image_files:
         if filename.endswith(('.jpg', '.jpeg', '.png', '.bmp')):
             image_path = os.path.join(image_folder, filename)
@@ -17,14 +19,33 @@ def annotate_images(image_folder):
             detected_poses = yolo_v8n_pose_inference(image)
             
             # Example: structure annotations (replace with actual output from YOLOv8n-pose)
-            for pose in detected_poses:
+            image_annotations = {
+                "id": image_id,
+                "file_name": filename,
+                "width": image.shape[1],
+                "height": image.shape[0],
+                "annotations": []
+            }
+            
+            for pose_id, pose in enumerate(detected_poses, 1):
                 keypoints = [(kp[0], kp[1]) for kp in pose['keypoints']]
+                bbox = pose['bbox']
+                
+                # Create annotation entry for each pose
                 annotation = {
-                    "image_path": image_path,
-                    "pose_keypoints": keypoints,
-                    "bounding_box": pose['bbox']
+                    "id": pose_id,
+                    "image_id": image_id,
+                    "category_id": 1,  # Assuming one category for poses
+                    "keypoints": keypoints,
+                    "bbox": bbox,
+                    "area": bbox[2] * bbox[3],  # Area calculation for COCO format
+                    "iscrowd": 0  # Assuming not crowd in COCO format
                 }
-                annotations.append(annotation)
+                
+                image_annotations["annotations"].append(annotation)
+            
+            annotations.append(image_annotations)
+            image_id += 1
     
     return annotations
 
@@ -42,14 +63,15 @@ def yolo_v8n_pose_inference(image):
 
 # Example usage
 if __name__ == "__main__":
-    image_folder = "images"
+    image_folder = "/Users/alessiacolumban/Downloads/POSE.v3i.coco (1)/images"
     
     annotations = annotate_images(image_folder)
     
-    # Print annotations (for verification)
-    for annotation in annotations:
-        print(annotation)
+    # Save annotations to COCO-style JSON file
+    coco_annotations = {
+        "images": annotations,
+        "categories": [{"id": 1, "name": "person"}]  # Example category definition
+    }
     
-    # Save annotations to JSON file
-    with open('annotations.json', 'w') as f:
-        json.dump(annotations, f, indent=4, default=str)  # Use default=str to handle non-serializable types
+    with open('annotations_coco.json', 'w') as f:
+        json.dump(coco_annotations, f, indent=4, default=str)  # Use default=str to handle non-serializable types
