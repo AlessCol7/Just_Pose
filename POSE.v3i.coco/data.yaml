@@ -1,0 +1,90 @@
+train: train/images
+val: valid/images
+test: test/images
+
+kpt_shape: [6, 3]
+flip_idx: [0, 1, 2, 3, 4, 5]
+
+nc: 11
+names: ['head', 'lower-left-hand', 'lower-left-let', 'lower-right-hand', 'lower-right-leg', 'person', 'trunk', 'upper-hand-left', 'upper-legt-leg', 'upper-right-hand', 'upper-right-leg']
+
+# Define the keypoints structure
+kp_flip: [[1, 2], [3, 4]]  # keypoints flip mapping (for augmentation)
+kp_pairs: [[1, 2], [3, 4]]  # keypoints line pairs (for drawing)
+
+info:
+  year: '2024'
+  version: '3'
+  description: 'Exported from roboflow.com'
+  contributor: ''
+  url: 'https://public.roboflow.com/object-detection/undefined'
+  date_created: '2024-07-17T08:29:50+00:00'
+
+licenses:
+  - id: 1
+    url: 'https://creativecommons.org/licenses/by/4.0/'
+    name: 'CC BY 4.0'
+
+categories:
+  - id: 0
+    name: 'Pose'
+    supercategory: 'none'
+
+  - id: 1
+    name: 'head'
+    supercategory: 'Pose'
+    keypoints:
+      - 'new-point-0'
+      - 'new-point-1'
+      - 'new-point-2'
+      - 'new-point-3'
+      - 'new-point-4'
+      - 'new-point-5'
+    skeleton:
+      - [1, 2]
+      - [2, 3]
+      - [3, 4]
+      - [4, 5]
+      - [5, 6]
+      - [6, 1]
+
+  - id: 2
+    name: 'lower-left-hand'
+    supercategory: 'Pose'
+    keypoints:
+      - 'new-point-0'
+      - 'new-point-1'
+    skeleton:
+      - [1, 2]
+
+  - id: 3
+    name: 'lower-left-let'
+    supercategory: 'Pose'
+    keypoints:
+      - 'new-point-0'
+      - 'new-point-1'
+    skeleton:
+      - [1, 2]
+
+  - id: 4
+    name: 'lower-right-hand'
+    supercategory: 'Pose'
+    keypoints:
+      - 'new-point-0'
+      - 'new-point-1'
+    skeleton:
+      - [1, 2]
+
+  - id: 5
+    name: 'lower-right-leg'
+    supercategory: 'Pose'
+    keypoints:
+      - 'new-point-0'
+      - 'new-point-1'
+    skeleton:
+      - [1, 2]
+
+  - id: 6
+    name: 'person'
+    supercategory: 'Pose'
+    keypoints: []

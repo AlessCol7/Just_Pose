@@ -2,8 +2,9 @@ import cv2
 import os
 import time
 import random
-from ultralytics import YOLO
+import json
 import numpy as np
+from ultralytics import YOLO
 
 # Load YOLO model
 model = YOLO('yolov8n-pose.pt')
@@ -12,39 +13,44 @@ model = YOLO('yolov8n-pose.pt')
 video_path = 0
 cap = cv2.VideoCapture(video_path)
 
-# Path to the extracted images folder
-images_folder = r'/Users/alessiacolumban/Just_Pose/POSE.v3i.coco/train'  # Update this path
-image_files = [os.path.join(images_folder, f) for f in os.listdir(images_folder) if os.path.isfile(os.path.join(images_folder, f))]
+# Path to the extracted images folder and annotations file
+images_folder = '/Users/alessiacolumban/Just_Pose/POSE.v3i.coco/train'
+annotations_file = os.path.join(images_folder, '_annotations.coco.json')
+
+# Load annotations
+with open(annotations_file, 'r') as f:
+    annotations = json.load(f)
+
+# Create a mapping from image filenames to keypoints
+image_keypoints = {}
+for annotation in annotations['annotations']:
+    image_id = annotation['image_id']
+    if 'keypoints' not in annotation:
+        continue  # Skip annotations without keypoints
+    keypoints = annotation['keypoints']
+    image_filename = next((img['file_name'] for img in annotations['images'] if img['id'] == image_id), None)
+    if image_filename:
+        image_keypoints[image_filename] = keypoints
+
+# List of image files
+image_files = list(image_keypoints.keys())
 
 last_image_time = time.time()
 display_interval = 8  # Interval in seconds
+reference_keypoints = None
 
-# Function to calculate IoU between two bounding boxes
-def calculate_iou(boxA, boxB):
-    # Extract coordinates
-    x1A, y1A, x2A, y2A = boxA
-    x1B, y1B, x2B, y2B = boxB
+# Function to calculate similarity between two sets of keypoints
+def calculate_similarity(kp1, kp2, threshold=0.5):
+    kp1 = np.array(kp1).reshape(-1, 3)[:, :2]  # Only (x, y) coordinates
+    kp2 = np.array(kp2).reshape(-1, 3)[:, :2]
     
-    # Calculate intersection coordinates
-    xA = max(x1A, x1B)
-    yA = max(y1A, y1B)
-    xB = min(x2A, x2B)
-    yB = min(y2A, y2B)
+    # Euclidean distance
+    distances = np.linalg.norm(kp1 - kp2, axis=1)
     
-    # Calculate intersection area
-    intersection_area = max(0, xB - xA + 1) * max(0, yB - yA + 1)
+    # Normalize and calculate similarity
+    similarity = np.mean(distances < threshold)
     
-    # Calculate area of each box
-    boxA_area = (x2A - x1A + 1) * (y2A - y1A + 1)
-    boxB_area = (x2B - x1B + 1) * (y2B - y1B + 1)
-    
-    # Calculate union area
-    union_area = boxA_area + boxB_area - intersection_area
-    
-    # Calculate IoU
-    iou = intersection_area / union_area
-    
-    return iou
+    return similarity
 
 # Loop over the video frames
 while cap.isOpened():
@@ -53,45 +59,51 @@ while cap.isOpened():
 
     if success:
         # Run YOLOv8 inference on the frame
-        results = model(frame, save=True)
+        results = model(frame)
 
-        # Iterate over the list of Results objects
+        # Extract keypoints from YOLO results
         for result in results:
-            # Check if there are any detections
             if result.boxes.xyxy.shape[0] > 0:
-                # Display the detections on the frame
-                for box, conf, cls in zip(result.boxes.xyxy, result.boxes.conf, result.boxes.cls):
-                    label = f'{result.names[int(cls)]}: {conf:.2f}'
-                    x1, y1, x2, y2 = map(int, box)
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), color=(0, 255, 0), thickness=2)
-                    cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0), 2)
-
-                # Compare with the last displayed random image
-                random_image = cv2.imread("/Users/alessiacolumban/Just_Pose/POSE.v3i.coco/train)  # Load the last displayed random image")
-                pose_detected = frame  # Replace with actual pose detection result
-                pose_reference = random_image  # Replace with actual random image pose
-
-                # Example comparison using IoU
-                detected_box = result.boxes.xyxy[0]  # Assuming one detection per frame
-                reference_box = [x1, y1, x2, y2]  # Adjust this to match your reference pose coordinates
+                # Extract detected keypoints
+                detected_keypoints = result.keypoints.xy.cpu().numpy()[0].flatten().tolist()
                 
-                iou = calculate_iou(detected_box, reference_box)
+                # Debug print to verify the structure of detected keypoints
+                print(f"Detected keypoints: {detected_keypoints}")
+                print(f"Length of detected keypoints: {len(detected_keypoints)}")
                 
-                if iou >= 0.5:  # Adjust the threshold as needed
-                    # Take screenshot and save it
-                    screenshot_path = os.path.join(images_folder, f'screenshot_{time.time()}.jpg')
-                    cv2.imwrite(screenshot_path, frame)
-                    print(f'Saved screenshot: {screenshot_path}')
+                # Check if it's time to display a new random image
+                if time.time() - last_image_time >= display_interval or reference_keypoints is None:
+                    random_image_path = random.choice(image_files)
+                    random_image = cv2.imread(os.path.join(images_folder, random_image_path))
+                    reference_keypoints = image_keypoints[random_image_path]
+                    
+                    # Ensure the reference keypoints have the same length as detected keypoints
+                    if len(reference_keypoints) != len(detected_keypoints):
+                        # Add default confidence of 1.0 to reference keypoints
+                        reference_keypoints = [kp if (i + 1) % 3 != 0 else 1.0 for i, kp in enumerate(reference_keypoints * (len(detected_keypoints) // len(reference_keypoints)))]
+                    
+                    # Debug print to verify the structure of reference keypoints
+                    print(f"Reference keypoints: {reference_keypoints}")
+                    print(f"Length of reference keypoints: {len(reference_keypoints)}")
+                    cv2.imshow('Random Pose Image', random_image)
+                    last_image_time = time.time()
+
+                # Compare detected keypoints with reference keypoints
+                if reference_keypoints is not None:
+                    if len(detected_keypoints) == len(reference_keypoints):
+                        similarity = calculate_similarity(detected_keypoints, reference_keypoints)
+                        if similarity >= 0.5:  # Adjust the threshold as needed
+                            # Take screenshot and save it
+                            screenshot_folder = '/Users/alessiacolumban/Just_Pose/POSE.v3i.coco/saved_screenshots'
+                            os.makedirs(screenshot_folder, exist_ok=True)
+                            screenshot_path = os.path.join(screenshot_folder, f'screenshot_{time.time()}.jpg')
+                            cv2.imwrite(screenshot_path, frame)
+                            print(f'Saved screenshot: {screenshot_path}')
+                    else:
+                        print("Keypoints length mismatch even after alignment. Skipping similarity check.")
 
             # Display the frame
             cv2.imshow('YOLOv8 Inference', frame)
-
-        # Check if it's time to display a new random image
-        if time.time() - last_image_time >= display_interval:
-            random_image_path = random.choice(image_files)
-            random_image = cv2.imread(random_image_path)
-            cv2.imshow('Random Pose Image', random_image)
-            last_image_time = time.time()
 
         # Break the loop if "q" is pressed
         if cv2.waitKey(1) & 0xFF == ord('q'):
