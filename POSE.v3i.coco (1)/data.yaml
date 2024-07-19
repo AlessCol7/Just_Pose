@@ -1,0 +1,5 @@
+train: /path/to/train/images
+val: /path/to/val/images
+
+nc: 17  # Number of keypoints or body parts
+names: ['head', 'shoulder', 'elbow', 'wrist', 'hip', 'knee', 'ankle', 'nose', 'eye_left', 'eye_right', 'ear_left', 'ear_right', 'shoulder_left', 'shoulder_right', 'elbow_left', 'elbow_right', 'wrist_left', 'wrist_right']

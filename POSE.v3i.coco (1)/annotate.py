@@ -1,77 +1,123 @@
-import os
 import cv2
+import os
 import json
+import numpy as np
+from ultralytics import YOLO
+from pathlib import Path
 
-# Function to annotate images using YOLOv8n-pose
-def annotate_images(image_folder):
-    annotations = []
-    image_files = os.listdir(image_folder)
-    
-    image_id = 1  # Starting image ID
-    
-    for filename in image_files:
-        if filename.endswith(('.jpg', '.jpeg', '.png', '.bmp')):
-            image_path = os.path.join(image_folder, filename)
-            image = cv2.imread(image_path)
-            
-            # Replace with your YOLOv8n-pose inference code
-            # Example: perform inference with YOLOv8n-pose
-            detected_poses = yolo_v8n_pose_inference(image)
-            
-            # Example: structure annotations (replace with actual output from YOLOv8n-pose)
-            image_annotations = {
-                "id": image_id,
-                "file_name": filename,
-                "width": image.shape[1],
-                "height": image.shape[0],
-                "annotations": []
-            }
-            
-            for pose_id, pose in enumerate(detected_poses, 1):
-                keypoints = [(kp[0], kp[1]) for kp in pose['keypoints']]
-                bbox = pose['bbox']
-                
-                # Create annotation entry for each pose
-                annotation = {
-                    "id": pose_id,
-                    "image_id": image_id,
-                    "category_id": 1,  # Assuming one category for poses
-                    "keypoints": keypoints,
-                    "bbox": bbox,
-                    "area": bbox[2] * bbox[3],  # Area calculation for COCO format
-                    "iscrowd": 0  # Assuming not crowd in COCO format
-                }
-                
-                image_annotations["annotations"].append(annotation)
-            
-            annotations.append(image_annotations)
-            image_id += 1
-    
-    return annotations
+# Initialize the YOLOv8n-pose model
+model = YOLO("yolov8n-pose.pt")  # replace with your model path if different
 
-# Dummy function to simulate YOLOv8n-pose inference (replace with actual code)
-def yolo_v8n_pose_inference(image):
-    # Simulated output, replace with actual YOLOv8n-pose inference
-    detected_poses = [
+# Define the path to your images folder and output folder
+images_folder = '/Users/alessiacolumban/Just_Pose/POSE.v3i.coco (1)/images'
+output_folder = '/Users/alessiacolumban/Just_Pose/POSE.v3i.coco (1)/output_folder'
+coco_output_file = '/Users/alessiacolumban/Just_Pose/POSE.v3i.coco (1)/annotations.json'
+
+# Create the output folder if it doesn't exist
+os.makedirs(output_folder, exist_ok=True)
+
+# Define the COCO keypoints order
+COCO_KEYPOINTS = [
+    'Nose', 'Left Eye', 'Right Eye', 'Left Ear', 'Right Ear',
+    'Left Shoulder', 'Right Shoulder', 'Left Elbow', 'Right Elbow',
+    'Left Wrist', 'Right Wrist', 'Left Hip', 'Right Hip',
+    'Left Knee', 'Right Knee', 'Left Ankle', 'Right Ankle'
+]
+
+# COCO annotations template
+coco_annotations = {
+    "images": [],
+    "annotations": [],
+    "categories": [
         {
-            "keypoints": [(100, 200), (150, 250), (200, 300)],  # Example keypoints
-            "bbox": [50, 100, 200, 300]  # Example bounding box [x_min, y_min, width, height]
-        },
-        # Add more poses as necessary
+            "id": 1,
+            "name": "person",
+            "supercategory": "person",
+            "keypoints": COCO_KEYPOINTS,
+            "skeleton": [
+                [0, 1], [1, 3], [3, 5], [0, 2], [2, 4], [4, 6],
+                [5, 7], [7, 9], [6, 8], [8, 10], [5, 11], [6, 12],
+                [11, 12], [11, 13], [13, 15], [12, 14], [14, 16]
+            ]
+        }
     ]
-    return detected_poses
+}
 
-# Example usage
-if __name__ == "__main__":
-    image_folder = "/Users/alessiacolumban/Downloads/POSE.v3i.coco (1)/images"
-    
-    annotations = annotate_images(image_folder)
-    
-    # Save annotations to COCO-style JSON file
-    coco_annotations = {
-        "images": annotations,
-        "categories": [{"id": 1, "name": "person"}]  # Example category definition
-    }
-    
-    with open('annotations_coco.json', 'w') as f:
-        json.dump(coco_annotations, f, indent=4, default=str)  # Use default=str to handle non-serializable types
+# Function to draw keypoints on image
+def draw_keypoints(image, keypoints, color=(0, 255, 0)):
+    for i, (x, y) in enumerate(keypoints):
+        if i < len(COCO_KEYPOINTS):
+            cv2.circle(image, (int(x), int(y)), 3, color, -1)
+            cv2.putText(image, COCO_KEYPOINTS[i], (int(x), int(y)), cv2.FONT_HERSHEY_SIMPLEX, 0.3, color, 1, cv2.LINE_AA)
+
+# Process each image in the folder
+for img_id, img_name in enumerate(os.listdir(images_folder), 1):
+    if img_name.endswith(('.jpg', '.jpeg', '.png')):
+        # Load image
+        img_path = os.path.join(images_folder, img_name)
+        img = cv2.imread(img_path)
+
+        # Apply the YOLOv8n-pose model to get pose keypoints
+        results = model(img_path)
+        
+        # Get the pose keypoints
+        for result_id, result in enumerate(results, 1):
+            keypoints = result.keypoints.xy
+            if keypoints is not None:
+                keypoints = keypoints.cpu().numpy().reshape(-1, 2)  # Ensure the keypoints are in the correct shape
+                keypoints = keypoints.astype(float).tolist()  # Convert to float list
+                print(f"Detected {len(keypoints)} keypoints.")  # Debugging line
+                # Draw keypoints on the image
+                draw_keypoints(img, keypoints)
+
+                # Prepare COCO annotation
+                keypoints_with_visibility = []
+                for x, y in keypoints:
+                    keypoints_with_visibility.extend([float(x), float(y), 2])  # Assume all keypoints are visible
+
+                # Get bounding box from result.boxes
+                if result.boxes is not None:
+                    bbox = result.boxes.xyxy.cpu().numpy()[0]
+                    bbox = bbox.astype(float).tolist()  # Convert to float list
+                    bbox_width = bbox[2] - bbox[0]
+                    bbox_height = bbox[3] - bbox[1]
+                    area = bbox_width * bbox_height
+
+                    annotation = {
+                        "id": result_id,
+                        "image_id": img_id,
+                        "category_id": 1,
+                        "bbox": bbox + [bbox_width, bbox_height],
+                        "area": float(area),
+                        "keypoints": keypoints_with_visibility,
+                        "face_box": [],  # Placeholder, update with actual face box if available
+                        "lefthand_box": [],  # Placeholder, update with actual left hand box if available
+                        "righthand_box": [],  # Placeholder, update with actual right hand box if available
+                        "foot_kpts": [],  # Placeholder, update with actual foot keypoints if available
+                        "face_kpts": [],  # Placeholder, update with actual face keypoints if available
+                        "lefthand_kpts": [],  # Placeholder, update with actual left hand keypoints if available
+                        "righthand_kpts": [],  # Placeholder, update with actual right hand keypoints if available
+                        "face_valid": False,  # Placeholder, update with actual validity if available
+                        "lefthand_valid": False,  # Placeholder, update with actual validity if available
+                        "righthand_valid": False,  # Placeholder, update with actual validity if available
+                        "foot_valid": False  # Placeholder, update with actual validity if available
+                    }
+                    coco_annotations["annotations"].append(annotation)
+                    
+        # Save the processed image
+        output_path = os.path.join(output_folder, img_name)
+        cv2.imwrite(output_path, img)
+        print(f"Processed and saved: {output_path}")
+
+        # Add image info to COCO annotations
+        coco_annotations["images"].append({
+            "id": img_id,
+            "file_name": img_name,
+            "width": int(img.shape[1]),
+            "height": int(img.shape[0])
+        })
+
+# Save COCO annotations to file
+with open(coco_output_file, 'w') as f:
+    json.dump(coco_annotations, f, indent=4)
+print(f"COCO annotations saved to {coco_output_file}")
