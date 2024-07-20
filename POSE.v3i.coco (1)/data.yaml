@@ -1,5 +1,23 @@
-train: /path/to/train/images
-val: /path/to/val/images
+# train: /Users/alessiacolumban/Just_Pose/POSE.v3i.coco (1)/annotated_images
+# val: /Users/alessiacolumban/Just_Pose/POSE.v3i.coco (1)/images
+
+
+
+# nc: 1  # Number of classes, for pose estimation usually this is 1 since we are detecting persons
+# names: ['person']
+
+# kpt_shape: [17, 3]  # Number of keypoints and the dimensions (x, y, confidence)
+# keypoints: [
+#     'nose', 'eye_left', 'eye_right', 'ear_left', 'ear_right', 
+#     'shoulder_left', 'shoulder_right', 'elbow_left', 'elbow_right', 
+#     'wrist_left', 'wrist_right', 'hip_left', 'hip_right', 
+#     'knee_left', 'knee_right', 'ankle_left', 'ankle_right'
+# ]
+
+train: /Users/alessiacolumban/Just_Pose/POSE.v3i.coco (1)/annotated_images
+val: /Users/alessiacolumban/Just_Pose/POSE.v3i.coco (1)/annotated_images
 
 nc: 17  # Number of keypoints or body parts
 names: ['head', 'shoulder', 'elbow', 'wrist', 'hip', 'knee', 'ankle', 'nose', 'eye_left', 'eye_right', 'ear_left', 'ear_right', 'shoulder_left', 'shoulder_right', 'elbow_left', 'elbow_right', 'wrist_left', 'wrist_right']
+
+kpt_shape: [17, 2]  # Example keypoint shape, adjust according to your needs
