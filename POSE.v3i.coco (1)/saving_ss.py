@@ -27,9 +27,9 @@ def compare_keypoints(keypoints1, keypoints2):
     return float('inf')
 
 # Function to calculate percentage similarity based on distance
-def calculate_similarity(dist, threshold=50):
-    max_distance = 1000  # Maximum possible distance (adjust as needed)
+def calculate_similarity(dist, max_distance=1000, threshold=50):
     similarity = max(0, (max_distance - dist) / max_distance * 100)
+    print(f"Distance: {dist}, Similarity: {similarity}%")  # Debug print for similarity and distance
     return similarity >= threshold
 
 # Load annotated images
@@ -58,6 +58,7 @@ while cap.isOpened():
 
         # Extract keypoints from current frame
         current_keypoints = extract_keypoints(results)
+        print(f"Current keypoints: {current_keypoints}")  # Debug print for current keypoints
 
         # Display a new annotated image every 8 seconds
         if time.time() - last_switch_time > 8 or current_image is None:
@@ -65,13 +66,13 @@ while cap.isOpened():
             current_image = cv2.imread(current_image_path)
             annotated_results = model(current_image)
             annotated_keypoints = extract_keypoints(annotated_results)
+            print(f"Annotated keypoints: {annotated_keypoints}")  # Debug print for annotated keypoints
             last_switch_time = time.time()
         
         # Compare keypoints and calculate similarity
         if annotated_keypoints:
             dist = compare_keypoints(current_keypoints, annotated_keypoints)
-            print(f"Distance to annotated pose: {dist}")
-            if calculate_similarity(dist, threshold=50):
+            if calculate_similarity(dist, max_distance=1000, threshold=50):  # Adjust max_distance as needed
                 # Save the frame as a screenshot
                 timestamp = int(time.time())
                 screenshot_path = os.path.join(screenshots_folder, f"screenshot_{timestamp}.png")
