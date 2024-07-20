@@ -1,38 +1,22 @@
 import cv2
-from ultralytics import YOLO
 import os
-import random
 import time
-from scipy.spatial import distance
+import random
+from ultralytics import YOLO
 
-# Initialize the YOLOv8n-pose model
-model = YOLO("yolov8n-pose.pt")  
+# Load YOLO model
+model = YOLO('yolov8n-pose.pt')
 
-# Function to extract keypoints from an image
-def extract_keypoints(results):
-    keypoints = []
-    for result in results:
-        if hasattr(result, 'keypoints') and result.keypoints is not None:
-            keypoints.append(result.keypoints.cpu().numpy())
-    return keypoints
-
-# Function to compare keypoints using Euclidean distance
-def compare_keypoints(keypoints1, keypoints2):
-    if keypoints1 and keypoints2:
-        dist = distance.euclidean(keypoints1[0].flatten(), keypoints2[0].flatten())
-        return dist
-    return float('inf')
-
-# Load annotated images
-annotated_images_folder = '/Users/alessiacolumban/Just_Pose/POSE.v3i.coco (1)/output_folder'  # Update this path
-annotated_images = [os.path.join(annotated_images_folder, f) for f in os.listdir(annotated_images_folder) if f.endswith(('.png', '.jpg', '.jpeg'))]
-
-# Open video file or capture device
+# Set video path (0 for webcam)
 video_path = 0
 cap = cv2.VideoCapture(video_path)
 
-last_switch_time = time.time()
-current_image = None
+# Path to the extracted images folder
+images_folder = r'/Users/alessiacolumban/Just_Pose/POSE.v3i.coco (1)/output_folder'  # Update this path
+image_files = [os.path.join(images_folder, f) for f in os.listdir(images_folder) if os.path.isfile(os.path.join(images_folder, f))]
+
+last_image_time = time.time()
+display_interval = 8  # Interval in seconds
 
 # Loop over the video frames
 while cap.isOpened():
@@ -40,40 +24,40 @@ while cap.isOpened():
     success, frame = cap.read()
 
     if success:
-        # Perform inference
-        results = model(frame, save=False)
+        # Run YOLOv8 inference on the frame
+        results = model(frame, save=True)
 
-        # Extract keypoints from current frame
-        current_keypoints = extract_keypoints(results)
+        # Print the results object
+        print(results)
 
-        # Display a new annotated image every 8 seconds
-        if time.time() - last_switch_time > 8 or current_image is None:
-            current_image_path = random.choice(annotated_images)
-            current_image = cv2.imread(current_image_path)
-            annotated_results = model(current_image)
-            annotated_keypoints = extract_keypoints(annotated_results)
-            last_switch_time = time.time()
+        # Iterate over the list of Results objects
+        for result in results:
+            # Draw the detections on the frame
+            for box, conf, cls in zip(result.boxes.xyxy, result.boxes.conf, result.boxes.cls):
+                label = f'{result.names[int(cls)]}: {conf:.2f}'
+                x1, y1, x2, y2 = map(int, box)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), color=(0, 255, 0), thickness=2)
+                cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+
+            # Display the frame
+            cv2.imshow('YOLOv8 Inference', frame)
+
+
         
-        # Compare keypoints
-        if annotated_keypoints:
-            dist = compare_keypoints(current_keypoints, annotated_keypoints)
-            print(f"Distance to annotated pose: {dist}")
+        # Check if it's time to display a new random image
+        if time.time() - last_image_time >= display_interval:
+            random_image_path = random.choice(image_files)
+            random_image = cv2.imread(random_image_path)
+            cv2.imshow('Random Pose Image', random_image)
+            last_image_time = time.time()
 
-        # Visualize the results
-        annotated_frame = results[0].plot()
-        
-        # Display the annotated frame
-        cv2.imshow('Live Feed', annotated_frame)
-        if current_image is not None:
-            cv2.imshow('Annotated Image', current_image)
-
-        # Press 'q' to exit
+        # Break the loop if "q" is pressed
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-
     else:
+        print('Video has ended or failed, exiting the loop')
         break
 
-# Release the video capture object
+# Release the video capture object and close the display windows
 cap.release()
 cv2.destroyAllWindows()
