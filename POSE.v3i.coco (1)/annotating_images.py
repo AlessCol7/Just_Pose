@@ -143,7 +143,12 @@ for img_id, img_name in enumerate(os.listdir(images_folder), 1):
         # Add annotations for this image to COCO annotations
         coco_annotations["annotations"].extend(img_annotations)
 
+# Convert all float32 values in coco_annotations to float
+def convert_float32(o):
+    if isinstance(o, np.float32):
+        return float(o)
+    raise TypeError
+
 # Save COCO annotations to file
 with open(coco_output_file, 'w') as f:
-    json.dump(coco_annotations, f, indent=4)
-print(f"COCO annotations saved to {coco_output_file}")
+    json.dump(coco_annotations, f, indent=4, default=convert_float32)
