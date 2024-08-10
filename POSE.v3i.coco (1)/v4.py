@@ -75,7 +75,7 @@ def compare_distances(distances1, distances2):
     return float('inf')
 
 # Function to calculate percentage similarity based on normalized difference
-def calculate_similarity(diff, threshold=0.3):
+def calculate_similarity(diff, threshold=0.5):
     similarity = max(0, (1 - diff) * 100)
     print(f"Difference: {diff}, Similarity: {similarity}%")  # Debug print for similarity and difference
     return similarity >= threshold * 100, similarity
